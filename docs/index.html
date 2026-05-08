@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRACE: Triage and Re-align by Alignment Conflict Evaluation</title>
+
+  <!-- Bulma CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- MathJax -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]},
+      TeX: { extensions: ["AMSmath.js", "AMSsymbols.js", "color.js"] }
+    });
+  </script>
+
+  <!-- Google Fonts: Playfair Display + Source Serif 4 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Base ─────────────────────────────────────────────── */
+    :root {
+      --ink:        #0f0f0f;
+      --ink-light:  #4a4a4a;
+      --ink-muted:  #8a8a8a;
+      --rule:       #d8d8d8;
+      --accent:     #1a5276;      /* deep navy */
+      --accent-mid: #2980b9;
+      --trace-bg:   #eaf4fd;      /* highlight for TRACE rows */
+      --tag-invert: #d4efdf;
+      --tag-punish: #fde8d8;
+      --tag-retain: #eaf0fb;
+      --page-max:   860px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 1.075rem;
+      line-height: 1.75;
+      color: var(--ink);
+      background: #ffffff;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Typography ──────────────────────────────────────── */
+    h1, h2, h3 {
+      font-family: 'Playfair Display', 'Georgia', serif;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: var(--ink);
+      border-bottom: 2px solid var(--ink);
+      padding-bottom: 0.35rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Page layout ─────────────────────────────────────── */
+    .page-wrap {
+      max-width: var(--page-max);
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    section.content-section {
+      padding: 3rem 0 2rem;
+      border-bottom: 1px solid var(--rule);
+    }
+    section.content-section:last-of-type { border-bottom: none; }
+
+    /* ── Conference badge ────────────────────────────────── */
+    .conference-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: var(--ink);
+      color: #fff;
+      font-family: 'Source Serif 4', serif;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.3rem 0.9rem;
+      border-radius: 2px;
+      margin-bottom: 1.4rem;
+    }
+
+    /* ── Hero / Header ───────────────────────────────────── */
+    .hero-wrap {
+      padding: 4rem 0 2.5rem;
+      text-align: center;
+    }
+
+    .paper-title {
+      font-size: clamp(1.9rem, 4vw, 2.8rem);
+      line-height: 1.22;
+      margin-bottom: 0.5rem;
+      color: var(--ink);
+    }
+
+    .paper-subtitle {
+      font-family: 'Source Serif 4', serif;
+      font-style: italic;
+      font-size: 1.05rem;
+      color: var(--ink-light);
+      margin-bottom: 2.2rem;
+    }
+
+    /* Author list */
+    .author-list {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.15rem 0.6rem;
+      font-size: 1.02rem;
+      margin-bottom: 0.6rem;
+    }
+    .author-list a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .author-list a:hover { text-decoration: underline; }
+    .author-sep { color: var(--ink-muted); }
+
+    .affil-list {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.3rem 1.2rem;
+      font-size: 0.84rem;
+      color: var(--ink-muted);
+      margin-bottom: 0.35rem;
+    }
+    .affil-list sup { font-size: 0.7em; }
+
+    .correspondence {
+      font-size: 0.84rem;
+      color: var(--ink-muted);
+      margin-bottom: 2rem;
+    }
+    .correspondence a { color: var(--ink-muted); }
+
+    /* Link buttons */
+    .link-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.7rem;
+      margin-bottom: 1rem;
+    }
+    .link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.52rem 1.3rem;
+      border: 1.5px solid var(--ink);
+      border-radius: 3px;
+      font-family: 'Source Serif 4', serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ink);
+      text-decoration: none;
+      transition: background 0.18s, color 0.18s;
+      background: transparent;
+    }
+    .link-btn:hover {
+      background: var(--ink);
+      color: #fff;
+    }
+    .link-btn i { font-size: 1rem; }
+
+    /* ── Abstract ─────────────────────────────────────────── */
+    .abstract-text {
+      font-size: 1.02rem;
+      line-height: 1.8;
+      color: var(--ink);
+      text-align: justify;
+      hyphens: auto;
+    }
+    .abstract-text strong { color: var(--accent); }
+
+    /* ── Pipeline SVG card ───────────────────────────────── */
+    .pipeline-card {
+      background: #fafafa;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 2rem 1.5rem 1.5rem;
+      margin-bottom: 2rem;
+      overflow-x: auto;
+    }
+
+    /* ── Stage cards ─────────────────────────────────────── */
+    .stage-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.1rem;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 640px) {
+      .stage-cards { grid-template-columns: 1fr; }
+    }
+
+    .stage-card {
+      border: 1.5px solid var(--rule);
+      border-radius: 6px;
+      padding: 1.25rem 1.1rem;
+      position: relative;
+    }
+    .stage-card .stage-num {
+      position: absolute;
+      top: -0.75rem;
+      left: 1rem;
+      background: var(--ink);
+      color: #fff;
+      font-family: 'Source Serif 4', serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.18rem 0.6rem;
+      border-radius: 2px;
+    }
+    .stage-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    .stage-card p {
+      font-size: 0.88rem;
+      line-height: 1.6;
+      color: var(--ink-light);
+      margin: 0;
+    }
+
+    /* Category tags */
+    .cat-tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 0.1rem 0.45rem;
+      border-radius: 2px;
+      margin: 0.1rem 0.15rem;
+    }
+    .cat-invert { background: var(--tag-invert); color: #186a3b; }
+    .cat-punish { background: var(--tag-punish); color: #a04000; }
+    .cat-retain { background: var(--tag-retain); color: #1a5276; }
+
+    /* ── Results tables ──────────────────────────────────── */
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 1rem 0;
+    }
+    .results-table thead tr {
+      background: var(--ink);
+      color: #fff;
+    }
+    .results-table thead th {
+      padding: 0.6rem 0.8rem;
+      font-family: 'Source Serif 4', serif;
+      font-weight: 600;
+      font-size: 0.82rem;
+      letter-spacing: 0.03em;
+      text-align: center;
+      border: none;
+    }
+    .results-table thead th:first-child { text-align: left; }
+    .results-table tbody tr { border-bottom: 1px solid #ececec; }
+    .results-table tbody td {
+      padding: 0.55rem 0.8rem;
+      text-align: center;
+      color: var(--ink);
+    }
+    .results-table tbody td:first-child { text-align: left; }
+    .results-table tbody tr.trace-row {
+      background: var(--trace-bg);
+      font-weight: 600;
+    }
+    .results-table tbody tr:hover { background: #f5f9fe; }
+    .results-table tbody tr.trace-row:hover { background: #d5eaf8; }
+
+    .table-caption {
+      font-family: 'Source Serif 4', serif;
+      font-size: 0.83rem;
+      color: var(--ink-muted);
+      font-style: italic;
+      margin-top: 0.5rem;
+      line-height: 1.5;
+    }
+
+    .results-subtitle {
+      font-family: 'Source Serif 4', serif;
+      font-size: 1.08rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin: 2rem 0 0.4rem;
+    }
+
+    /* ── Leaderboard-style tables ─────────────────────────── */
+    .model-labels-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-bottom: 0.85rem;
+      align-items: center;
+    }
+    .leaderboard-label {
+      display: inline-block;
+      padding: 0.22rem 0.75rem;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-size: 0.82rem;
+      font-family: 'Source Serif 4', serif;
+    }
+    .table-container {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 0.5rem 0 0.75rem;
+      border: 1px solid #ddd;
+    }
+    .table-container td {
+      padding: 0.48rem 0.75rem;
+      text-align: center;
+      border: 1px solid #e4e4e4;
+      color: var(--ink);
+      vertical-align: middle;
+    }
+    .table-container td:first-child { text-align: left; }
+
+    /* ── BibTeX ──────────────────────────────────────────── */
+    .bibtex-wrap {
+      position: relative;
+    }
+    .bibtex-block {
+      background: #f7f7f7;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 1.25rem 1.2rem;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: #2c2c2c;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 0.6rem;
+      right: 0.6rem;
+      background: var(--ink);
+      color: #fff;
+      border: none;
+      padding: 0.3rem 0.75rem;
+      font-family: 'Source Serif 4', serif;
+      font-size: 0.76rem;
+      font-weight: 600;
+      border-radius: 2px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: background 0.18s;
+    }
+    .copy-btn:hover { background: var(--accent); }
+    .copy-btn.copied { background: #27ae60; }
+
+    /* ── Contact grid ────────────────────────────────────── */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 0.8rem;
+      margin-top: 1rem;
+    }
+    .contact-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      font-size: 0.9rem;
+    }
+    .contact-item i { color: var(--ink-muted); margin-top: 0.2rem; flex-shrink: 0; }
+    .contact-name { font-weight: 600; display: block; }
+    .contact-item a { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+    .contact-item a:hover { text-decoration: underline; }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    footer {
+      padding: 2rem 0 2.5rem;
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--ink-muted);
+      border-top: 1px solid var(--rule);
+      margin-top: 1rem;
+    }
+    footer a { color: var(--ink-muted); }
+    footer a:hover { color: var(--accent); }
+
+    /* ── Key number callouts ─────────────────────────────── */
+    .key-numbers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.2rem;
+      margin: 1.5rem 0;
+      justify-content: center;
+    }
+    .key-num {
+      text-align: center;
+      padding: 0.9rem 1.5rem;
+      border: 1.5px solid var(--rule);
+      border-radius: 4px;
+      min-width: 140px;
+    }
+    .key-num .num {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1.1;
+      display: block;
+    }
+    .key-num .label {
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      font-weight: 400;
+      line-height: 1.4;
+      display: block;
+      margin-top: 0.2rem;
+    }
+
+    /* ── Algorithm box ──────────────────────────────────── */
+    .algorithm-box {
+      background: #fafafa;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 1.4rem 1.6rem;
+      overflow-x: auto;
+      margin-bottom: 1.5rem;
+    }
+    .algorithm-box .MathJax_Display { margin: 0 !important; }
+
+    /* ── Divider rule ────────────────────────────────────── */
+    hr.section-rule {
+      border: none;
+      border-top: 1px solid var(--rule);
+      margin: 0;
+    }
+
+    /* ── Responsive tweaks ───────────────────────────────── */
+    @media (max-width: 520px) {
+      .paper-title { font-size: 1.7rem; }
+      .section-title { font-size: 1.35rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     HEADER / HERO
+══════════════════════════════════════════════════════════ -->
+<div class="page-wrap">
+  <div class="hero-wrap">
+
+    <div style="text-align:center; margin-bottom:1.2rem;">
+      <span class="conference-badge">
+        <i class="fas fa-award" style="font-size:0.8em;"></i>
+        ICML 2026
+      </span>
+    </div>
+
+    <h1 class="paper-title">
+      TRACE: Triage and Re-align<br />by Alignment Conflict Evaluation
+    </h1>
+    <p class="paper-subtitle">The Realignment Problem: When Right becomes Wrong in LLMs</p>
+
+    <!-- Authors -->
+    <div class="author-list">
+      <a href="mailto:aakash.sensharma@invideo.io">Aakash Sen Sharma</a><sup>1</sup>
+      <span class="author-sep">&thinsp;·&thinsp;</span>
+      <a href="mailto:debdeep.respailab@gmail.com">Debdeep Sanyal</a><sup>2</sup>
+      <span class="author-sep">&thinsp;·&thinsp;</span>
+      <a href="mailto:manodeepray1@gmail.com">Manodeep Ray</a><sup>3</sup>
+      <span class="author-sep">&thinsp;·&thinsp;</span>
+      <a href="mailto:vivek.srivastava@tcs.com">Vivek Srivastava</a><sup>3</sup>
+      <span class="author-sep">&thinsp;·&thinsp;</span>
+      <a href="mailto:shirish.karande@tcs.com">Shirish Karande</a><sup>3</sup>
+      <span class="author-sep">&thinsp;·&thinsp;</span>
+      <a href="mailto:murari.mandalfcs@kiit.ac.in">Murari Mandal</a><sup>4</sup>
+    </div>
+
+    <div class="affil-list">
+      <span><sup>1</sup> InvideoAI</span>
+      <span><sup>2</sup> Birla AI Labs</span>
+      <span><sup>3</sup> TCS Research</span>
+      <span><sup>4</sup> KIIT, Bhubaneswar</span>
+    </div>
+
+    <p class="correspondence">
+      Correspondence:
+      <a href="mailto:aakash.sensharma@invideo.io">aakash.sensharma@invideo.io</a>
+    </p>
+
+    <!-- Link buttons -->
+    <div class="link-buttons">
+      <a href="#" class="link-btn">
+        <i class="fas fa-file-pdf"></i> Paper
+      </a>
+      <a href="https://github.com/respailab/TRACE" class="link-btn" target="_blank" rel="noopener">
+        <i class="fab fa-github"></i> Code
+      </a>
+      <a href="#" class="link-btn">
+        <i class="fas fa-archive"></i> arXiv
+      </a>
+    </div>
+
+  </div><!-- /.hero-wrap -->
+</div><!-- /.page-wrap -->
+
+<hr class="section-rule" />
+
+<!-- ══════════════════════════════════════════════════════════
+     ABSTRACT
+══════════════════════════════════════════════════════════ -->
+<div class="page-wrap">
+  <section class="content-section">
+    <h2 class="section-title">Abstract</h2>
+    <p class="abstract-text">
+      Post-training alignment of large language models (LLMs) relies on large-scale human annotations guided by policy specifications that change over time. Cultural shifts, value reinterpretations, and regulatory or industrial updates make static alignment increasingly brittle. As policies evolve, deployed models can diverge from current alignment objectives, creating an <strong>Alignment–Reality Gap</strong> that is difficult to audit or correct. Existing remediation typically requires re-annotation under revised guidelines, which introduces systematic challenges, including guideline ambiguity, annotator interpretation drift, and reduced consistency at scale.
+    </p>
+    <p class="abstract-text" style="margin-top:1rem;">
+      We introduce <strong>TRACE</strong> (Triage and Re-align by Alignment Conflict Evaluation), a framework that transforms re-alignment into a structured optimization problem over existing data <em>without requiring fresh human annotation</em>. Leveraging a stronger model as a proxy judge, TRACE operates via a three-stage pipeline: (1) triaging preference pairs into inversion, suppression, or retention categories based on alignment conflicts; (2) computing an alignment impact score via bi-level optimization to prioritize high-leverage samples; and (3) executing updates using a hybrid objective that combines relational losses (e.g., IPO) for preference inversion and punitive losses (e.g., NPO) for response suppression.
+    </p>
+    <p class="abstract-text" style="margin-top:1rem;">
+      Experiments on <strong>Qwen2.5-7B</strong>, <strong>Gemma-2-9B</strong>, and <strong>Llama-3.1-8B</strong> demonstrate robust re-alignment on synthetic benchmarks and the PKU-SafeRLHF dataset without degrading general utility. This work provides a scalable approach for LLM realignment under evolving data annotation policies and alignment guidelines.
+    </p>
+
+  </section>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     RESULTS
+══════════════════════════════════════════════════════════ -->
+<div class="page-wrap">
+  <section class="content-section">
+    <h2 class="section-title">Results</h2>
+
+    <!-- Table 1: Human Preference -->
+    <p class="results-subtitle">Human Preference Evaluation</p>
+    <p style="font-size:0.88rem; color:var(--ink-light); margin-bottom:0.8rem;">
+      Annotators were shown response triplets (DPO-Gold, TRACE, U2A) and selected the best one following π_new, blind to model identity.
+    </p>
+    <div class="model-labels-container">
+      <span class="leaderboard-label" style="background-color: rgb(224, 243, 224);">DPO-Gold (upper bound)</span>
+      <span class="leaderboard-label" style="background-color: rgba(255, 208, 80, 0.2);">TRACE (Ours)</span>
+      <span class="leaderboard-label" style="background-color: rgba(249, 242, 248, 1);">U2A (baseline)</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table-container">
+        <tbody>
+          <tr style="background-color: rgba(122, 122, 122, 0.15);">
+            <td><strong>Method</strong></td>
+            <td><strong>PKU-SafeRLHF Win Rate vs. U2A</strong></td>
+            <td><strong>SynthValueBench Win Rate vs. U2A</strong></td>
+            <td><strong>Krippendorff's α</strong></td>
+          </tr>
+          <tr style="background-color: rgb(224, 243, 224);">
+            <td><b>DPO-Gold</b> <em style="font-weight:400; color:var(--ink-muted);">(upper bound)</em></td>
+            <td>87.1%</td>
+            <td>92.4%</td>
+            <td>0.80</td>
+          </tr>
+          <tr style="background-color: rgba(255, 208, 80, 0.2);">
+            <td><b>TRACE (Ours)</b></td>
+            <td><b>81.8%</b></td>
+            <td><b>85.3%</b></td>
+            <td><b>0.77</b></td>
+          </tr>
+          <tr style="background-color: rgba(249, 242, 248, 1);">
+            <td><b>U2A</b> <em style="font-weight:400; color:var(--ink-muted);">(baseline)</em></td>
+            <td>—</td>
+            <td>—</td>
+            <td>0.76</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-caption">Table 1. Human preference evaluation. TRACE closes 81.8% of the gap between purely punitive unlearning and gold-standard full re-annotation.</p>
+
+    <!-- Table 2: General Capability -->
+    <p class="results-subtitle" style="margin-top:2.2rem;">General Capability Benchmarks (PKU-SafeRLHF)</p>
+    <p style="font-size:0.88rem; color:var(--ink-light); margin-bottom:0.8rem;">
+      TRACE preserves MMLU and GSM8K within confidence intervals of the base model. The HellaSwag reduction (~3.2 pts) is bounded and favorable given the 81.8% policy adherence gain.
+    </p>
+    <div class="model-labels-container">
+      <span class="leaderboard-label" style="background-color: rgba(229, 237, 255);">Base Model</span>
+      <span class="leaderboard-label" style="background-color: rgb(224, 243, 224);">DPO-Gold (upper bound)</span>
+      <span class="leaderboard-label" style="background-color: rgba(255, 208, 80, 0.2);">TRACE (Ours)</span>
+      <span class="leaderboard-label" style="background-color: rgba(249, 242, 248, 1);">U2A (baseline)</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table-container">
+        <tbody>
+          <tr style="background-color: rgba(122, 122, 122, 0.15);">
+            <td><strong>Method</strong></td>
+            <td><strong>GPQA ↑</strong></td>
+            <td><strong>MMLU ↑</strong></td>
+            <td><strong>HellaSwag ↑</strong></td>
+            <td><strong>GSM8K ↑</strong></td>
+          </tr>
+          <tr style="background-color: rgba(229, 237, 255);">
+            <td><b>Base Model</b></td>
+            <td>31.6 ± 0.9</td>
+            <td><b>70.6 ± 0.8</b></td>
+            <td><b>81.4 ± 1.0</b></td>
+            <td>70.4 ± 0.8</td>
+          </tr>
+          <tr style="background-color: rgb(224, 243, 224);">
+            <td><b>DPO-Gold</b></td>
+            <td><b>32.1 ± 1.1</b></td>
+            <td>70.5 ± 0.9</td>
+            <td>81.3 ± 1.2</td>
+            <td><b>70.8 ± 1.0</b></td>
+          </tr>
+          <tr style="background-color: rgba(255, 208, 80, 0.2);">
+            <td><b>TRACE (Ours)</b></td>
+            <td>30.1 ± 0.1</td>
+            <td>70.2 ± 0.8</td>
+            <td>78.2 ± 0.9</td>
+            <td>70.6 ± 0.7</td>
+          </tr>
+          <tr style="background-color: rgba(249, 242, 248, 1);">
+            <td><b>U2A</b></td>
+            <td>29.5 ± 0.3</td>
+            <td>70.2 ± 1.1</td>
+            <td>80.8 ± 1.2</td>
+            <td>69.9 ± 1.1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-caption">Table 2. General capability benchmarks. TRACE preserves general utility while achieving strong re-alignment.</p>
+
+    <!-- Table 3: TPA -->
+    <p class="results-subtitle" style="margin-top:2.2rem;">Target Policy Agreement (PKU-SafeRLHF)</p>
+    <p style="font-size:0.88rem; color:var(--ink-light); margin-bottom:0.8rem;">
+      TPA measures the percentage of responses complying with π_new, scored by the policy oracle. TRACE at 5k samples outperforms Naive Oracle DPO at 20k samples.
+    </p>
+    <div class="model-labels-container">
+      <span class="leaderboard-label" style="background-color: rgba(229, 237, 255);">Llama-3.1-8B</span>
+      <span class="leaderboard-label" style="background-color: rgb(224, 243, 224);">Gemma-2-9B</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table-container">
+        <tbody>
+          <tr style="background-color: rgba(122, 122, 122, 0.15);">
+            <td><strong>Model</strong></td>
+            <td><strong>Data Size</strong></td>
+            <td><strong>Naive Oracle DPO</strong></td>
+            <td><strong>TRACE (Ours)</strong></td>
+            <td><strong>Δ</strong></td>
+          </tr>
+          <tr style="background-color: rgba(229, 237, 255);">
+            <td><b>Llama-3.1-8B</b></td>
+            <td>5k</td>
+            <td>35.9</td>
+            <td><b>55.9</b></td>
+            <td style="color:#1a5276; font-weight:600;">+20.0</td>
+          </tr>
+          <tr style="background-color: rgba(229, 237, 255);">
+            <td></td>
+            <td>10k</td>
+            <td>46.5</td>
+            <td><b>65.5</b></td>
+            <td style="color:#1a5276; font-weight:600;">+19.0</td>
+          </tr>
+          <tr style="background-color: rgba(229, 237, 255);">
+            <td></td>
+            <td>20k</td>
+            <td>52.2</td>
+            <td><b>70.7</b></td>
+            <td style="color:#1a5276; font-weight:600;">+18.5</td>
+          </tr>
+          <tr style="background-color: rgb(224, 243, 224);">
+            <td><b>Gemma-2-9B</b></td>
+            <td>5k</td>
+            <td>37.1</td>
+            <td><b>54.4</b></td>
+            <td style="color:#1a5276; font-weight:600;">+17.3</td>
+          </tr>
+          <tr style="background-color: rgb(224, 243, 224);">
+            <td></td>
+            <td>10k</td>
+            <td>48.2</td>
+            <td><b>66.9</b></td>
+            <td style="color:#1a5276; font-weight:600;">+18.7</td>
+          </tr>
+          <tr style="background-color: rgb(224, 243, 224);">
+            <td></td>
+            <td>20k</td>
+            <td>53.9</td>
+            <td><b>71.8</b></td>
+            <td style="color:#1a5276; font-weight:600;">+17.9</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-caption">Table 3. Target Policy Agreement across model families and data scales. Gains are consistent and not explained by oracle access alone.</p>
+
+    <!-- Table 4: Ablation -->
+    <p class="results-subtitle" style="margin-top:2.2rem;">Component-wise Ablation (Llama-3.1-8B)</p>
+    <p style="font-size:0.88rem; color:var(--ink-light); margin-bottom:0.8rem;">
+      Each component of TRACE contributes to the final performance. KL regularization is critical for preserving general utility; triage and impact weighting drive policy agreement.
+    </p>
+    <div class="model-labels-container">
+      <span class="leaderboard-label" style="background-color: rgba(255, 208, 80, 0.2);">TRACE (Full)</span>
+      <span class="leaderboard-label" style="background-color: rgba(249, 242, 248, 1);">Ablation variants</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="table-container">
+        <tbody>
+          <tr style="background-color: rgba(122, 122, 122, 0.15);">
+            <td><strong>Variant</strong></td>
+            <td><strong>Policy Agreement ↑</strong></td>
+            <td><strong>MMLU ↑</strong></td>
+            <td><strong>ASR ↓</strong></td>
+          </tr>
+          <tr style="background-color: rgba(255, 208, 80, 0.2);">
+            <td><b>TRACE (Full)</b></td>
+            <td><b>70.7</b></td>
+            <td><b>70.2</b></td>
+            <td><b>27.3</b></td>
+          </tr>
+          <tr style="background-color: rgba(249, 242, 248, 1);">
+            <td>w/o Triage</td>
+            <td>58.1</td>
+            <td>70.2</td>
+            <td>24.6</td>
+          </tr>
+          <tr style="background-color: rgba(249, 242, 248, 1);">
+            <td>w/o KL Regularization</td>
+            <td>71.5</td>
+            <td>64.1</td>
+            <td>29.8</td>
+          </tr>
+          <tr style="background-color: rgba(249, 242, 248, 1);">
+            <td>w/o Impact Weighting</td>
+            <td>62.8</td>
+            <td>69.5</td>
+            <td>32.1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-caption">Table 4. Ablation study. Removing any component degrades performance; KL regularization is especially critical for capability preservation.</p>
+
+  </section>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     ALGORITHM
+══════════════════════════════════════════════════════════ -->
+<div class="page-wrap">
+  <section class="content-section">
+    <h2 class="section-title">Algorithm</h2>
+
+    <!-- Algorithm 1: TRACE -->
+    <div class="algorithm-box">
+      \[
+      \begin{array}{l}
+      \textbf{Algorithm 1:}\text{ The TRACE Algorithm for Guidelines Re-alignment} \\[3pt]
+      \hline \\[-6pt]
+      \textbf{Input: } \mathcal{M}_{\text{ref}} \text{ (frozen, params } \theta_{\text{ref}}\text{); }
+        \mathcal{M}_{\theta} \text{ (trainable, } \theta \leftarrow \theta_{\text{ref}}\text{); }
+        \mathcal{D} = \{(x_k, y_w^{(k)}, y_l^{(k)})\};\;
+        \mathcal{O} \text{ (oracle); } \pi_{\text{new}} \\
+      \textbf{Hyper: } \eta,\; \beta,\; \alpha_{\text{KL}},\; \gamma,\; B,\; \epsilon,\; T_{\max} \\[2pt]
+      \hline \\[-6pt]
+      1: \quad \mathcal{D}_{\text{I}} \leftarrow \emptyset;\;\; \mathcal{D}_{\text{II}} \leftarrow \emptyset;\;\; \mathcal{D}_{\text{R}} \leftarrow \emptyset
+        \hspace{12em} {\color{blue}{\small\textit{// Triage}}} \\
+      2: \quad \textbf{for each } (x_k, y_w^{(k)}, y_l^{(k)}) \in \mathcal{D} \textbf{ do} \\
+      3: \qquad (c_w, c_l) \leftarrow (\pi_{\text{new}}(y_w^{(k)}|x_k),\; \pi_{\text{new}}(y_l^{(k)}|x_k)) \\
+      4: \qquad \mathcal{D}_{\text{I}} \mathrel{+}= \{(x_k,y_w^{(k)},y_l^{(k)})\} \cdot \mathbb{I}[c_w=0,\; c_l=1] \\
+      5: \qquad \mathcal{D}_{\text{II}} \mathrel{+}= \{(x_k,y_w^{(k)},y_l^{(k)})\} \cdot \mathbb{I}[c_w=0,\; c_l=0] \\
+      6: \qquad \mathcal{D}_{\text{R}} \mathrel{+}= \{(x_k,y_w^{(k)},y_l^{(k)})\} \cdot \mathbb{I}[c_w=1] \\
+      7: \quad \textbf{end for};\quad \mathcal{D}_{\text{conflict}} \leftarrow \mathcal{D}_{\text{I}} \cup \mathcal{D}_{\text{II}} \\[4pt]
+      8: \quad {\color{purple}{\small\textit{// Alignment Impact Computation}}} \\
+      9: \quad \mathcal{D}_{\text{gold}} \leftarrow \text{GetGoldBatch}(\mathcal{D}_{\text{I}}, \mathcal{D}_{\text{II}}, \mathcal{D}_{\text{R}}, B)\;\text{(Alg. 2)} \\
+      10: \quad g_{\mathcal{J}} \leftarrow \nabla_{\theta} \sum_{(x,y_w,y_l) \in \mathcal{D}_{\text{gold}}} \ell_{\text{IPO}}(x,y_w,y_l;\theta) \;\big|_{\theta=\theta_{\text{ref}}} \\
+      11: \quad \text{Initialize } \mathbf{w}:\mathbb{N}\to\mathbb{R} \\
+      12: \quad \textbf{for all } (x_i,y_w^{(i)},y_l^{(i)}) \in \mathcal{D}_{\text{I}} \textbf{ do} \\
+      13: \qquad g_i \leftarrow \nabla_\theta\, \ell_{\text{IPO}}(x_i,y_l^{(i)},y_w^{(i)};\theta) \;\big|_{\theta=\theta_{\text{ref}}};\quad
+        \mathbf{w}[i] \leftarrow \langle g_{\mathcal{J}},\, g_i \rangle \\
+      14: \quad \textbf{end for} \\
+      15: \quad \textbf{for all } (x_j,y_w^{(j)},y_l^{(j)}) \in \mathcal{D}_{\text{II}} \textbf{ do} \\
+      16: \qquad \textbf{if } \mathcal{O} \neq \text{None: }\; y_c^{(j)} \leftarrow \mathcal{O}(x_j,\pi_{\text{new}});\;
+        g_j \leftarrow \nabla_\theta\,\ell_{\text{IPO}}(x_j,y_c^{(j)},y_w^{(j)};\theta)\;\big|_{\theta=\theta_{\text{ref}}} \\
+      17: \qquad \textbf{else: }\; g_j \leftarrow \nabla_\theta\, \ell_{\text{NPO}}(x_j,y_w^{(j)},y_l^{(j)};\theta)\;\big|_{\theta=\theta_{\text{ref}}} \\
+      18: \qquad \mathbf{w}[j] \leftarrow \langle g_{\mathcal{J}},\, g_j \rangle \\
+      19: \quad \textbf{end for} \\
+      20: \quad \mathbf{w}[k] \leftarrow (1/\gamma)\,\mathbf{w}[k];\;\;
+        \mathbf{w}[k] \leftarrow \max(0,\mathbf{w}[k]);\;\;
+        Z \leftarrow \sum_{k}|\mathbf{w}[k]|;\;\;
+        \mathbf{w}[k] \leftarrow \mathbf{w}[k]/Z \;\;\text{for all } k \in \mathcal{D}_{\text{conflict}} \\[4pt]
+      21: \quad {\color{red}{\small\textit{// Finetune } \mathcal{M}_\theta}} \\
+      22: \quad \textbf{while } \|\nabla_\theta \mathcal{L}_{\text{TRACE}}\| > \epsilon \textbf{ and } t < T_{\max} \textbf{ do} \\
+      23: \qquad \text{Sample: } \mathcal{B}_{\text{I}} \sim \mathcal{D}_{\text{I}},\;\;
+        \mathcal{B}_{\text{P}} \sim \mathcal{D}_{\text{II}},\;\; \mathcal{B}_{\text{R}} \sim \mathcal{D}_{\text{R}} \\
+      24: \qquad \mathcal{L}_{\text{I}} \leftarrow \sum_{i \in \mathcal{B}_{\text{I}}} \mathbf{w}[i]\cdot \ell_{\text{IPO}}(x_i, y_l^{(i)}, y_w^{(i)};\theta) \\
+      25: \qquad \textbf{if } \mathcal{O} \neq \text{None: }\;
+        \mathcal{L}_{\text{II}} \leftarrow \sum_{j \in \mathcal{B}_{\text{P}}} \mathbf{w}[j]\cdot \ell_{\text{IPO}}(x_j,y_c^{(j)},y_w^{(j)};\theta) \\
+      26: \qquad \textbf{else: }\;
+        \mathcal{L}_{\text{II}} \leftarrow \sum_{j \in \mathcal{B}_{\text{P}}} \mathbf{w}[j]\cdot \ell_{\text{NPO}}(x_j,y_w^{(j)},y_l^{(j)};\theta) \\
+      27: \qquad \mathcal{L}_{\text{KL}} \leftarrow \sum_{k \in \mathcal{B}_{\text{R}}}
+        \text{KL}\big(\pi_{\theta_{\text{ref}}}(\cdot|x_k)\;\|\;\pi_\theta(\cdot|x_k)\big) \\
+      28: \qquad \mathcal{L}_{\text{TRACE}} \leftarrow \mathcal{L}_{\text{I}} + \mathcal{L}_{\text{II}} + \alpha_{\text{KL}}\,\mathcal{L}_{\text{KL}};\quad
+        \theta \leftarrow \theta - \eta\,\nabla_\theta \mathcal{L}_{\text{TRACE}} \\
+      29: \quad \textbf{end while} \\[4pt]
+      \textbf{where:} \\
+      \quad \Delta_\theta(x,y_1,y_2) := \log\frac{\pi_\theta(y_1|x)}{\pi_{\theta_{\text{ref}}}(y_1|x)} - \log\frac{\pi_\theta(y_2|x)}{\pi_{\theta_{\text{ref}}}(y_2|x)} \\
+      \quad \ell_{\text{IPO}}(x,y_+,y_-;\theta) := -\log\sigma(\beta\,\Delta_\theta(x,y_+,y_-)) \\
+      \quad \ell_{\text{NPO}}(x,y_w,y_l;\theta) :=
+        -\log\sigma\!\left(-\beta\log\frac{\pi_\theta(y_w|x)}{\pi_{\theta_{\text{ref}}}(y_w|x)}\right)
+        -\log\sigma\!\left(-\beta\log\frac{\pi_\theta(y_l|x)}{\pi_{\theta_{\text{ref}}}(y_l|x)}\right) \\
+      \hline
+      \end{array}
+      \]
+    </div>
+
+    <!-- Algorithm 2: Gold Batch Construction -->
+    <div class="algorithm-box">
+      \[
+      \begin{array}{l}
+      \textbf{Algorithm 2: } \text{Gold-Standard Preference Batch Construction} \\[3pt]
+      \hline\\[-7pt]
+      \textbf{Input: } \mathcal{D}_{\text{I}},\, \mathcal{D}_{\text{II}},\, \mathcal{D}_{\text{R}} \text{ (triaged datasets); } B \text{ (batch size)} \\
+      \hline\\[-7pt]
+      1{:}\;\; \mathcal{D}_{\text{gold}} \leftarrow \emptyset;\quad
+        \mathcal{Y}_{\text{compliant}} \leftarrow \{y_w : (x, y_w, y_l) \in \mathcal{D}_{\text{R}}\} \cup \{y_l : (x, y_w, y_l) \in \mathcal{D}_{\text{I}}\} \\
+      2{:}\;\; (B_{\text{R}},\, B_{\text{I}}) \leftarrow (\min(|\mathcal{D}_{\text{R}}|, \lfloor B/3 \rfloor),\; \min(|\mathcal{D}_{\text{I}}|, \lfloor B/3 \rfloor)) \\
+      3{:}\;\; \mathcal{S}_{\text{R}} \leftarrow \text{UniformSample}(\mathcal{D}_{\text{R}}, B_{\text{R}});\quad
+        \mathcal{D}_{\text{gold}} \leftarrow \mathcal{D}_{\text{gold}} \cup \{(x, y_w, y_l) : (x, y_w, y_l) \in \mathcal{S}_{\text{R}}\} \\
+      4{:}\;\; \mathcal{S}_{\text{I}} \leftarrow \text{UniformSample}(\mathcal{D}_{\text{I}}, B_{\text{I}});\quad
+        \mathcal{D}_{\text{gold}} \leftarrow \mathcal{D}_{\text{gold}} \cup \{(x, y_l, y_w) : (x, y_w, y_l) \in \mathcal{S}_{\text{I}}\} \\
+      5{:}\;\; \textbf{if } \mathcal{Y}_{\text{compliant}} \neq \emptyset \land \mathcal{D}_{\text{II}} \neq \emptyset \textbf{ then} \\
+      6{:}\;\quad B_{\text{P}} \leftarrow B - |\mathcal{D}_{\text{gold}}|;\quad \mathcal{S}_{\text{P}} \leftarrow \text{UniformSample}(\mathcal{D}_{\text{II}}, B_{\text{P}}) \\
+      7{:}\;\quad \mathcal{D}_{\text{gold}} \leftarrow \mathcal{D}_{\text{gold}} \cup
+        \{(x,\, \text{UniformSample}(\mathcal{Y}_{\text{compliant}}),\, y_w) : (x, y_w, y_l) \in \mathcal{S}_{\text{P}}\} \\
+      8{:}\;\; \textbf{end if} \\
+      9{:}\;\; \textbf{return } \mathcal{D}_{\text{gold}} \\
+      \hline
+      \end{array}
+      \]
+    </div>
+
+  </section>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     BIBTEX
+══════════════════════════════════════════════════════════ -->
+<div class="page-wrap">
+  <section class="content-section">
+    <h2 class="section-title">BibTeX</h2>
+    <div class="bibtex-wrap">
+      <button class="copy-btn" id="copyBtn" onclick="copyBib()">
+        <i class="far fa-copy"></i> Copy
+      </button>
+      <pre class="bibtex-block" id="bibtext">@inproceedings{sharma2026trace,
+  title     = {{TRACE}: Triage and Re-align by Alignment Conflict Evaluation},
+  author    = {Sen Sharma, Aakash and Sanyal, Debdeep and Ray, Manodeep
+               and Srivastava, Vivek and Karande, Shirish and Mandal, Murari},
+  booktitle = {International Conference on Machine Learning},
+  year      = {2026}
+}</pre>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CONTACT
+══════════════════════════════════════════════════════════ -->
+<div class="page-wrap">
+  <section class="content-section" style="border-bottom:none;">
+    <h2 class="section-title">Contact</h2>
+    <p style="font-size:0.9rem; color:var(--ink-light); margin-bottom:1.2rem;">
+      For questions about the paper or code, reach out to any of the authors or open a
+      <a href="https://github.com/respailab/TRACE/issues" style="color:var(--accent);" target="_blank" rel="noopener">GitHub Issue</a>.
+    </p>
+    <div class="contact-grid">
+      <div class="contact-item">
+        <i class="fas fa-envelope"></i>
+        <div>
+          <span class="contact-name">Aakash Sen Sharma</span>
+          <a href="mailto:aakash.sensharma@invideo.io">aakash.sensharma@invideo.io</a>
+        </div>
+      </div>
+      <div class="contact-item">
+        <i class="fas fa-envelope"></i>
+        <div>
+          <span class="contact-name">Debdeep Sanyal</span>
+          <a href="mailto:debdeep.respailab@gmail.com">debdeep.respailab@gmail.com</a>
+        </div>
+      </div>
+      <div class="contact-item">
+        <i class="fas fa-envelope"></i>
+        <div>
+          <span class="contact-name">Manodeep Ray</span>
+          <a href="mailto:manodeepray1@gmail.com">manodeepray1@gmail.com</a>
+        </div>
+      </div>
+      <div class="contact-item">
+        <i class="fas fa-envelope"></i>
+        <div>
+          <span class="contact-name">Vivek Srivastava</span>
+          <a href="mailto:vivek.srivastava@tcs.com">vivek.srivastava@tcs.com</a>
+        </div>
+      </div>
+      <div class="contact-item">
+        <i class="fas fa-envelope"></i>
+        <div>
+          <span class="contact-name">Shirish Karande</span>
+          <a href="mailto:shirish.karande@tcs.com">shirish.karande@tcs.com</a>
+        </div>
+      </div>
+      <div class="contact-item">
+        <i class="fas fa-envelope"></i>
+        <div>
+          <span class="contact-name">Murari Mandal</span>
+          <a href="mailto:murari.mandalfcs@kiit.ac.in">murari.mandalfcs@kiit.ac.in</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════════════════ -->
+<footer>
+  <div class="page-wrap">
+    <p>
+      This page is adapted from the
+      <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank" rel="noopener">Academic Project Page Template</a>.
+      Licensed under
+      <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>.
+    </p>
+  </div>
+</footer>
+
+<script>
+  function copyBib() {
+    const text = document.getElementById('bibtext').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.classList.add('copied');
+      btn.innerHTML = '<i class="fas fa-check"></i> Copied';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<i class="far fa-copy"></i> Copy';
+      }, 2000);
+    });
+  }
+</script>
+
+</body>
+</html>
