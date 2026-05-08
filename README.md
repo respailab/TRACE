@@ -1,4 +1,4 @@
-# The Realignment Problem: When Right becomes Wrong in LLMs
+# [The Realignment Problem: When Right becomes Wrong in LLMs](https://respailab.github.io/TRACE/)
 
 **Accepted to ICML 2026 Main Track (26% acceptance rate)**
 
