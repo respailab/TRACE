@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model runs & outputs
+runs/
+.runs/
+outputs/
+cache_dir/
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# Data files (large)
+*.json.bak
+pku_*.json
+*_triaged.json
+*_weighted.json
+
+# Logs
+*.log
+
+# Environment
+.env
+*.env
+
+# Editor
+.vscode/
+.idea/
+
