@@ -9,14 +9,18 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <!-- MathJax -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML"></script>
-  <script type="text/x-mathjax-config">
-    MathJax.Hub.Config({
-      tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]},
-      TeX: { extensions: ["AMSmath.js", "AMSsymbols.js", "color.js"] }
-    });
+  <!-- MathJax 3 -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$'], ['\\(','\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']],
+        packages: {'[+]': ['color', 'ams']}
+      },
+      loader: {load: ['[tex]/color', '[tex]/ams']}
+    };
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
 
   <!-- Google Fonts: Playfair Display + Source Serif 4 -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -792,14 +796,14 @@
       \textbf{Hyper: } \eta,\; \beta,\; \alpha_{\text{KL}},\; \gamma,\; B,\; \epsilon,\; T_{\max} \\[2pt]
       \hline \\[-6pt]
       1: \quad \mathcal{D}_{\text{I}} \leftarrow \emptyset;\;\; \mathcal{D}_{\text{II}} \leftarrow \emptyset;\;\; \mathcal{D}_{\text{R}} \leftarrow \emptyset
-        \hspace{12em} {\color{blue}{\small\textit{// Triage}}} \\
+        \hspace{12em} {\color{blue}{\textit{// Triage}}} \\
       2: \quad \textbf{for each } (x_k, y_w^{(k)}, y_l^{(k)}) \in \mathcal{D} \textbf{ do} \\
       3: \qquad (c_w, c_l) \leftarrow (\pi_{\text{new}}(y_w^{(k)}|x_k),\; \pi_{\text{new}}(y_l^{(k)}|x_k)) \\
       4: \qquad \mathcal{D}_{\text{I}} \mathrel{+}= \{(x_k,y_w^{(k)},y_l^{(k)})\} \cdot \mathbb{I}[c_w=0,\; c_l=1] \\
       5: \qquad \mathcal{D}_{\text{II}} \mathrel{+}= \{(x_k,y_w^{(k)},y_l^{(k)})\} \cdot \mathbb{I}[c_w=0,\; c_l=0] \\
       6: \qquad \mathcal{D}_{\text{R}} \mathrel{+}= \{(x_k,y_w^{(k)},y_l^{(k)})\} \cdot \mathbb{I}[c_w=1] \\
       7: \quad \textbf{end for};\quad \mathcal{D}_{\text{conflict}} \leftarrow \mathcal{D}_{\text{I}} \cup \mathcal{D}_{\text{II}} \\[4pt]
-      8: \quad {\color{purple}{\small\textit{// Alignment Impact Computation}}} \\
+      8: \quad {\color{purple}{\textit{// Alignment Impact Computation}}} \\
       9: \quad \mathcal{D}_{\text{gold}} \leftarrow \text{GetGoldBatch}(\mathcal{D}_{\text{I}}, \mathcal{D}_{\text{II}}, \mathcal{D}_{\text{R}}, B)\;\text{(Alg. 2)} \\
       10: \quad g_{\mathcal{J}} \leftarrow \nabla_{\theta} \sum_{(x,y_w,y_l) \in \mathcal{D}_{\text{gold}}} \ell_{\text{IPO}}(x,y_w,y_l;\theta) \;\big|_{\theta=\theta_{\text{ref}}} \\
       11: \quad \text{Initialize } \mathbf{w}:\mathbb{N}\to\mathbb{R} \\
@@ -817,8 +821,8 @@
         \mathbf{w}[k] \leftarrow \max(0,\mathbf{w}[k]);\;\;
         Z \leftarrow \sum_{k}|\mathbf{w}[k]|;\;\;
         \mathbf{w}[k] \leftarrow \mathbf{w}[k]/Z \;\;\text{for all } k \in \mathcal{D}_{\text{conflict}} \\[4pt]
-      21: \quad {\color{red}{\small\textit{// Finetune } \mathcal{M}_\theta}} \\
-      22: \quad \textbf{while } \|\nabla_\theta \mathcal{L}_{\text{TRACE}}\| > \epsilon \textbf{ and } t < T_{\max} \textbf{ do} \\
+      21: \quad {\color{red}{\textit{// Finetune } \mathcal{M}_\theta}} \\
+      22: \quad \textbf{while } \|\nabla_\theta \mathcal{L}_{\text{TRACE}}\| \gt \epsilon \textbf{ and } t \lt T_{\max} \textbf{ do} \\
       23: \qquad \text{Sample: } \mathcal{B}_{\text{I}} \sim \mathcal{D}_{\text{I}},\;\;
         \mathcal{B}_{\text{P}} \sim \mathcal{D}_{\text{II}},\;\; \mathcal{B}_{\text{R}} \sim \mathcal{D}_{\text{R}} \\
       24: \qquad \mathcal{L}_{\text{I}} \leftarrow \sum_{i \in \mathcal{B}_{\text{I}}} \mathbf{w}[i]\cdot \ell_{\text{IPO}}(x_i, y_l^{(i)}, y_w^{(i)};\theta) \\
